@@ -4,21 +4,22 @@
 import numpy as np
 import pandas as pd
 import tensorflow.compat.v1 as tf
-from tensorflow.contrib.layers import xavier_initializer, l2_regularizer
-
+import tf_slim              as slim
+import matplotlib.pyplot as plt
 # == tf.reset_default_graph()
+tf.disable_eager_execution()
 tf.reset_default_graph()
 
 #INPUT_PATH = 'PATH_TO_LABELED_DATA'
-INPUT_PATH = 'H:/PC_ubuntu_space/Raindrop_folder/Rainfall_project_2023/'
+INPUT_PATH = 'F:/Raindrop_folder/Rainfall_project_2023/'
 #OUTPUT_PATH = 'PATH_TO_TRAINING_RESULT'
-OUTPUT_PATH = 'H:/PC_ubuntu_space/Raindrop_folder/Rainfall_project_2023/model/'
+OUTPUT_PATH = 'F:/Raindrop_folder/Rainfall_project_2023/model/v3/'
 
 # Features: X1, Y1, Area1, a1, b1, canting_angle_1,
 #           X2, Y2, Area2, a2, b2, canting_angle_2,
 #           Velocity
 # NUM_FEATURES: totoal features we consider, but it isn't used in here
-NUM_FEATURES = 13
+NUM_FEATURES = 7
 
 # WEIGHTS: (1) control every parameters in convenient
 #          (2) the result below derives from many experiments
@@ -28,7 +29,7 @@ NUM_FEATURES = 13
 WEIGHTS = np.array([1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1,],      #1為使用此資料 0為不使用資料 新版11個資料全部使用就填11個1 
                    dtype = np.bool).reshape(1, -1)
 
-EPOCHES = int(5e4) # int(5e4)
+EPOCHES = int(15000) # int(1e4)
 LEARNING_RATE = 1e-3
 LR_DECAY_RATIO = 1 - 1e-3
 MIN_LEARNING_RATE = 1e-7
@@ -68,23 +69,34 @@ def feature_weight(data):
     weights = np.matlib.repmat(WEIGHTS, data.shape[0], 1)
     return data[weights].reshape(-1, np.sum(WEIGHTS.astype(np.int)))
 
-def split_data(data, training_ratio = 0.7):
-    dev_ratio = (1 - training_ratio) / 2    # test_ratio = dev_ratio
-    np.random.shuffle(data)
-    length = len(data)
-    #[.......flag1...flag2...end]
-    flag1 = int(np.ceil(training_ratio * length))
-    flag2 = flag1 + int(np.ceil(dev_ratio * length))
+def split_data(data,training_ratio = 0.8):
+        # dev_ratio = (1 - training_ratio) / 2    # test_ratio = dev_ratio
+        # np.random.shuffle(data)
+        # length = len(data)
+        # #[.......flag1...flag2...end]
+        # flag1 = int(np.ceil(training_ratio * length))
+        # flag2 = flag1 + int(np.ceil(dev_ratio * length))
 
-    indices = list(range(0, flag1))
-    training_data = data[indices]
+        # indices = list(range(0, flag1))
+        # training_data = data[indices]
 
-    indices = list(range(flag1, flag2))
-    dev_data = data[indices]
+        # indices = list(range(flag1, flag2))
+        # dev_data = data[indices]
 
-    indices = list(range(flag2, length))
-    test_data = data[indices]
-    return training_data, dev_data, test_data
+        # indices = list(range(flag2, length))
+        # test_data = data[indices]
+        # return training_data, dev_data, test_data    
+        dev_ratio = 1 - training_ratio  
+        np.random.shuffle(data)
+        length = len(data)
+        #[.......flag1...end]
+        flag1 = int(np.ceil(training_ratio * length))
+        indices = list(range(0, flag1))
+        training_data = data[indices]
+        indices = list(range(flag1, length))
+        dev_data = data[indices]
+        return training_data, dev_data
+
 
 def select_batches(data, batch_size):
     np.random.shuffle(data)
@@ -124,38 +136,28 @@ tst = tf.placeholder(tf.bool)
 # training iteration
 iter = tf.placeholder(tf.int32)
 # set L2 Regularizer
-regularizer = l2_regularizer(scale = L2_BETA)
+regularizer = slim.l2_regularizer(scale = L2_BETA)
 
-W1 = tf.get_variable(dtype = tf.float32, shape = [np.sum(WEIGHTS.astype(np.int)), L1],
-                     initializer = xavier_initializer(),
-                     regularizer = regularizer, name = 'W1')
-B1 = tf.get_variable(dtype = tf.float32, shape = [1, L1],
-                     initializer = tf.constant_initializer(0.1),
-                     regularizer = regularizer, name = 'B1')
-W2 = tf.get_variable(dtype = tf.float32, shape = [L1, L2],
-                     initializer = xavier_initializer(),
-                     regularizer = regularizer, name = 'W2')
-B2 = tf.get_variable(dtype = tf.float32, shape = [1, L2],
-                     initializer = tf.constant_initializer(0.1),
-                     regularizer = regularizer, name = 'B2')
-W3 = tf.get_variable(dtype = tf.float32, shape = [L2, L3],
-                     initializer = xavier_initializer(),
-                     regularizer = regularizer, name = 'W3')
-B3 = tf.get_variable(dtype = tf.float32, shape = [1, L3],
-                     initializer = tf.constant_initializer(0.1),
-                     regularizer = regularizer, name = 'B3')
-W4 = tf.get_variable(dtype = tf.float32, shape = [L3, L4],
-                     initializer = xavier_initializer(),
-                     regularizer = regularizer, name = 'W4')
-B4 = tf.get_variable(dtype = tf.float32, shape = [1, L4],
-                     initializer = tf.constant_initializer(0.1),
-                     regularizer = regularizer, name = 'B4')
-W5 = tf.get_variable(dtype = tf.float32, shape = [L4, L5],
-                     initializer = xavier_initializer(),
-                     regularizer = regularizer, name = 'W5')
-B5 = tf.get_variable(dtype = tf.float32, shape = [1, L5],
-                     initializer = tf.constant_initializer(0.1),
-                     regularizer = regularizer, name = 'B5')
+W1 = tf.get_variable(dtype = tf.float32, shape = [NUM_FEATURES, L1], initializer =
+                     tf.initializers.glorot_uniform(), regularizer = regularizer, name = 'W1')
+B1 = tf.get_variable(dtype = tf.float32, shape = [1, L1], initializer =
+                     tf.constant_initializer(0.1), regularizer = regularizer, name = 'B1')
+W2 = tf.get_variable(dtype = tf.float32, shape = [L1, L2], initializer =
+                     tf.initializers.glorot_uniform(), regularizer = regularizer, name = 'W2')
+B2 = tf.get_variable(dtype = tf.float32, shape = [1, L2], initializer =
+                     tf.constant_initializer(0.1), regularizer = regularizer, name = 'B2')
+W3 = tf.get_variable(dtype = tf.float32, shape = [L2, L3], initializer =
+                     tf.initializers.glorot_uniform(), regularizer = regularizer, name = 'W3')
+B3 = tf.get_variable(dtype = tf.float32, shape = [1, L3], initializer =
+                     tf.constant_initializer(0.1), regularizer = regularizer, name = 'B3')
+W4 = tf.get_variable(dtype = tf.float32, shape = [L3, L4], initializer =
+                     tf.initializers.glorot_uniform(), regularizer = regularizer, name = 'W4')
+B4 = tf.get_variable(dtype = tf.float32, shape = [1, L4], initializer =
+                     tf.constant_initializer(0.1), regularizer = regularizer, name = 'B4')
+W5 = tf.get_variable(dtype = tf.float32, shape = [L4, L5], initializer =
+                    tf.initializers.glorot_uniform(), regularizer = regularizer, name = 'W5')
+B5 = tf.get_variable(dtype = tf.float32, shape = [1, L5], initializer =
+                     tf.constant_initializer(0.1), regularizer = regularizer, name = 'B5')
 
 Z1 = tf.matmul(X, W1) + B1
 Z1_, update_ema1 = batchnorm(Z1, tst, iter)
@@ -195,7 +197,7 @@ true_negative_data_path = INPUT_PATH + 'true_negative_data_with_vel.xlsx'
 true_positive_data_path = INPUT_PATH + 'true_positive_data_with_vel.xlsx'
 
 normalize_para, data = normalize_data(true_positive_data_path, true_negative_data_path, epsilon = 1e-12)
-training_data, dev_data, test_data = split_data(data)
+training_data, dev_data = split_data(data)
 
 # save data
 # np.save(OUTPUT_PATH + 'training_data', training_data)
@@ -209,9 +211,9 @@ training_data = np.hstack((training_X, training_y))
 dev_X = dev_data[:, 0 : -1]
 dev_X = feature_weight(dev_X)
 dev_y = np.reshape(dev_data[:, -1], [-1, 1])
-test_X = test_data[:, 0 : -1]
-test_X = feature_weight(test_X)
-test_y = np.reshape(test_data[:, -1], [-1, 1])
+# test_X = test_data[:, 0 : -1]
+# test_X = feature_weight(test_X)
+# test_y = np.reshape(test_data[:, -1], [-1, 1])
 
 Accuracy, loss_ = [], []
 lr_ = LEARNING_RATE
@@ -238,20 +240,18 @@ for epoch in range(1, (EPOCHES + 1)):
     dev_loss = np.mean(dev_loss)
     # record training and dev loss
     loss_.append((training_loss, dev_loss))
-
+    dev_accuracy = calculate_accuracy(dev_X, dev_y, sess)
+    training_accuracy = calculate_accuracy(training_X, training_y, sess)
+    Accuracy.append((training_accuracy, dev_accuracy))
     if epoch % 10 == 0 or (epoch + 1) == EPOCHES:
         dev_accuracy = calculate_accuracy(dev_X, dev_y, sess)
         training_accuracy = calculate_accuracy(training_X, training_y, sess)
         Accuracy.append((training_accuracy, dev_accuracy))
         print('Epoch : {:d}/{:d}, Loss : {:.6f}, Traing Accuracy : {:.6f}, Dev Accuracy : {:.6f}'.format(epoch, EPOCHES, training_loss, training_accuracy, dev_accuracy))
-        if epoch % 1000 == 0:
-            save_path = saver.save(sess, (OUTPUT_PATH + 'match_raindrop_{}.ckpt'.format(epoch)))
-            print('Model saved in : {}'.format(save_path))
     else:
         print('Epoch : {:d}/{:d}, Loss : {:.6f}'.format(epoch, EPOCHES, training_loss))
 print(normalize_para)
 np.save(OUTPUT_PATH + 'NORMALIZE_PARAMETERS', normalize_para)
 np.save(OUTPUT_PATH + 'ACCURACY', Accuracy)
 np.save(OUTPUT_PATH + 'LOSS', loss_)
-
-# label_y, binary_y, test_accuracy = calculate_accuracy(test_X, test_y, sess)
+#label_y, binary_y, test_accuracy = calculate_accuracy(test_X, test_y, sess)

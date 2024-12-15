@@ -1,7 +1,6 @@
 # // +FHDR--------------------------------------------------------------------------------------------------------- //
 # // Project ____________                                                                                           //
-# // File name __________ detect_final.py                                                                           //
-# // Creator ____________ Yan, Wei-Ting                                                                             //
+# // File name __________ detect_final.py                                                                           //                                                                         //
 # // Built Date _________ 01-07-2024                                                                                //
 # // Function ___________ rename_files_add_zero                                                                     //
 # //                      gen_data_image                                                                            //
@@ -36,9 +35,9 @@ import matplotlib.patches as patches
 from matplotlib.path import Path
 from sklearn.metrics import confusion_matrix
 from path_def import detect_raindrop_path_def
+import shutil
 
-READ_DATA_PATH, WRITE_R_PATH, WRITE_D_PATH, WRITE_THERSHOLD_PATH = detect_raindrop_path_def()
-
+READ_DATA_PATH, WRITE_R_PATH, WRITE_D_PATH, WRITE_THERSHOLD_PATH,WRITE_THERSHOLD_ORI_PATH = detect_raindrop_path_def()
 # >>>>>>>>>>>>>>>>>>>> var >>>>>>>>>>>>>>>>>>>> #
 diffThreshold      = int(5)
 maxval             = int(255)
@@ -54,17 +53,24 @@ closing_kernel = morphology.disk(radius = 7)
 #  function             /**/****\**\**/**/****\**\**/**/****\**\**/**/****\**\**/**/****\**\**/**/****\**\**/**/***
 # *********************/**/******\**\/**/******\**\/**/******\**\/**/******\**\/**/******\**\/**/******\**\/**/****
 def rename_files_add_zero(path):
+    print("\n========================= start rename  =========================\n")
     for filename in os.listdir(path):
         if filename.endswith('.png'):
             parts = filename.split('_')
             last_part = parts[-1].split('.')[0]
+            if (last_part == '001') : 
+               print("\n========================= already rename =========================\n")
+               return
             new_last_part = last_part.zfill(3)
             new_filename = '_'.join(parts[:-1]) + '_' + new_last_part + '.png'
             os.rename(os.path.join(path, filename), os.path.join(path, new_filename))
+    print("\n========================= finish rename  =========================\n")
 
 def check_path_exist(check_path):
     if not os.path.exists(check_path):
+        print("\n========================== Checking Path ==========================\n")
         os.makedirs(check_path)
+    print("========================== Checked path ==========================")
 
 def del_ds_store(file_list):
     if file_list[0] == '.DS_Store': file_list.remove('.DS_Store')
@@ -97,6 +103,8 @@ def gen_data_image( readpath, write_r_path, write_d_path, write_threshold_path):
 
       gray_pre_image = cv2.cvtColor(pre_image, cv2.COLOR_RGB2GRAY)
       gray_now_image = cv2.cvtColor(now_image, cv2.COLOR_RGB2GRAY)
+      gray_now_image = gray_now_image.astype('uint8')
+      gray_pre_image = gray_pre_image.astype('uint8')
 
       pre_image = now_image.copy()
 
@@ -124,7 +132,9 @@ def gen_data_image( readpath, write_r_path, write_d_path, write_threshold_path):
       if (sum2 > areaThreshold ) :
         save_name_t = "T" + now_image_name[1:21] + ".png"        
         cv2.imwrite(write_threshold_path + save_name_t, median_to_th_binary)
-      
+        tempname=str(int(now_image_name[18:21])-1)
+        ori_image_name=now_image_name[:18]+tempname.zfill(3)+now_image_name[21:]
+        shutil.copy(readpath + ori_image_name, WRITE_THERSHOLD_ORI_PATH+ori_image_name)
       if (sum > areaThreshold ) :
         save_name_r = "R" + now_image_name[1:21] + ".png"
         save_name_d = "D" + now_image_name[1:21] + ".png"
@@ -156,12 +166,10 @@ def gen_data_image( readpath, write_r_path, write_d_path, write_threshold_path):
 check_path_exist(WRITE_R_PATH)
 check_path_exist(WRITE_D_PATH)
 check_path_exist(WRITE_THERSHOLD_PATH)
+check_path_exist(WRITE_THERSHOLD_ORI_PATH)
 rename_files_add_zero(READ_DATA_PATH)
 
 # ***********************/**/**\**\****/**/**\**\****/**/**\**\****/**/**\**\****/**/**\**\****/**/**\**\****/**/**
 #    Main               /**/****\**\**/**/****\**\**/**/****\**\**/**/****\**\**/**/****\**\**/**/****\**\**/**/***
 # *********************/**/******\**\/**/******\**\/**/******\**\/**/******\**\/**/******\**\/**/******\**\/**/****
 gen_data_image(READ_DATA_PATH, WRITE_R_PATH, WRITE_D_PATH, WRITE_THERSHOLD_PATH)
-
-
-
